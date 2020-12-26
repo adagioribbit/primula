@@ -1,0 +1,237 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <map>
+#include <math.h>
+
+#include "Sieve.h"
+
+using namespace std;
+typedef string::size_type MapSize;
+		
+Sieve::Sieve(int* primalityFormatingWidth){
+	hasZero = false;
+	tensWidth = primalityFormatingWidth;
+	primalityFormatingIndex = 0;
+	cycles = new Cycles();
+	primes = new PrimeList();
+
+	recurrences[1] = new Recurrence();
+	recurrences[3] = new Recurrence();
+	recurrences[7] = new Recurrence();
+	recurrences[9] = new Recurrence();
+}
+
+void Sieve::alignRecurrences(){
+	for(iter_rec = recurrences.begin(); iter_rec != recurrences.end(); iter_rec++){
+		iter_rec->second->align(primes);
+	}
+}
+
+void Sieve::addPrime(unsigned long prime){
+	primes->add(prime);
+}
+
+void Sieve::addCycle(){
+	unsigned long recLen = recurrences[1]->getLength();
+	unsigned long prime = primes->getValueAtIndex(recLen);
+	unsigned long mod10 = prime % 10;
+	unsigned long ten = ((prime - mod10) / 10);
+	unsigned long square = prime * prime;
+
+	unsigned long lastPrime = primes->getLast()->value;
+	unsigned long lastPrimeMod10 = lastPrime % 10;
+	unsigned long lastPrimeTen = ((lastPrime - lastPrimeMod10) / 10);
+
+	Cycle cycle = cycles->getCycle(mod10);
+	unsigned long cycleAlign = lastPrimeTen - ten;
+
+	recurrences[cycle.mods[0]]->add( ((prime + cycleAlign) % prime) );
+	unsigned long ref = prime;
+	for(int i = 1, j = 0; i <= 3; i++, j++){
+		ref -= ( cycle.gaps[j] + (ten * cycles->tensGaps[j]) );
+		recurrences[cycle.mods[i]]->add( ((ref + cycleAlign) % prime));
+	}
+}
+
+void Sieve::saveTenPrimality(unsigned long &currTen){
+	
+	struct Formater {
+		static string primalityStr(bool &hasRec, unsigned long &currTen){
+			if(hasRec){
+				return "    ";
+			}else{
+				if(currTen > 999){
+					return "999 ";
+				}else{
+					string strnum = to_string(currTen);
+					if( 3 > strnum.size() )
+						strnum.insert(0, 3 - strnum.size(), '0');
+
+					return strnum+" ";
+				}
+			}
+		}
+	};
+
+	int recKey = 1;
+	string filePrimality;
+	ofstream outputFile;
+	
+	for(int i=0; i<=3; i++){
+		filePrimality = "primality_["+ to_string(recKey) +"]_"+ to_string(*tensWidth) +"_tens_per_line.txt";	
+		recurrences[recKey]->checkForZeros(hasZero);
+		
+		outputFile.open(filePrimality, ios::app);
+		filePrimality = "primality_["+ to_string(recKey) +"]_"+ to_string(*tensWidth) +"_tens_per_line.txt";	
+		recurrences[recKey]->checkForZeros(hasZero);
+		
+		outputFile.open(filePrimality, ios::app);
+		filePrimality = "primality_["+ to_string(recKey) +"]_"+ to_string(*tensWidth) +"_tens_per_line.txt";	
+		recurrences[recKey]->checkForZeros(hasZero);
+		
+		outputFile.open(filePrimality, ios::app);
+		outputFile << Formater::primalityStr(hasZero, currTen);
+		if(primalityFormatingIndex == *tensWidth-1)
+			outputFile << endl;
+		outputFile.close();
+
+		if(i<3) recKey += cycles->tensGaps[i];
+	}
+	
+	primalityFormatingIndex = (primalityFormatingIndex + 1) % *tensWidth;
+}
+
+void Sieve::analyse(unsigned long limit, bool saveTenModularPrimality, bool isJumpStarted){
+    unsigned int mod10;
+
+	if(!isJumpStarted){
+		probe = 1;
+    	currSquare = 1;
+		currTen = 0;
+		currPosProbeLoop = 1;
+	}
+
+	while (probe < limit) {
+        while (currPosProbeLoop <= 3) {
+            probe += cycles->probeLoop[currPosProbeLoop];  //  TODO : à remplacer par sieve.probeLoop
+            mod10 = probe % 10;
+			recurrences[mod10]->checkForZeros(hasZero);
+            if (probe == 3 || !hasZero) {
+                if (currSquare <= probe) {
+                    addPrime(probe);
+                    currSquare = (probe == 3) ? 9 : pow(primes->getValueAtIndex(recurrences[1]->getLength()),2);
+                    addCycle();
+                } else {
+                    addPrime(probe);
+                }
+            }
+            currPosProbeLoop++;
+        }
+		
+		if(saveTenModularPrimality)
+			saveTenPrimality(currTen);
+        
+		alignRecurrences();
+        currPosProbeLoop = 0;
+		currTen++;
+    }
+}
+
+void Sieve::loadPreviousStates(string &jumpStartFilePath){
+	unsigned long sqrtMaxPrime;
+	unsigned int mod10;
+	Boundary bound;
+
+	loadPrimeList(jumpStartFilePath);
+	
+	probe = primes->getLast()->value;
+	mod10 = probe % 10;
+	currTen = probe - mod10;
+	sqrtMaxPrime = sqrt(probe);
+	
+	switch (mod10) {
+		case 1:
+			currPosProbeLoop = 1;
+			break;
+		case 3:
+			currPosProbeLoop = 2;
+			break;
+		case 7:
+			currPosProbeLoop = 3;
+			break;
+		case 9:
+			currPosProbeLoop = 0;
+			break;
+		default:
+			cout << "Hunnnnnnn ! Try again !" << endl;
+			break;
+	}
+
+	bound = primes->getBoundingPrime(sqrtMaxPrime);
+	currSquare = bound.value * bound.value;
+
+	while( recurrences[1]->getLength() <= bound.index ) {
+		addCycle();
+	}
+	alignRecurrences();
+}
+
+void Sieve::loadPrimeList(string &jumpStartFilePath){
+	string currLocale = locale("").name().substr(0,5);
+	string line;
+	unsigned long lastPrime, prime;
+	ifstream primeFile (jumpStartFilePath);
+	
+	if (primeFile.is_open()) {
+		try {
+			lastPrime = 0;
+			while (getline(primeFile,line)) {
+				prime = stoi(line);
+				if(prime > 2 && lastPrime < prime){
+					addPrime(prime);
+					lastPrime = prime;
+				}else{
+					if(currLocale == "fr_FR"){
+						cerr << "La suite de nombres premiers dans " << jumpStartFilePath << " n'est pas strictement croissante." << endl;
+					}else{
+						cerr << "The prime numbers sequence in " << jumpStartFilePath << " is not strictly increasing." << endl;
+					}
+					exit(EXIT_FAILURE);
+				}
+			}
+			primeFile.close();
+		} catch (const invalid_argument& ia) {
+			if(currLocale == "fr_FR"){
+				cerr << "Une des entrées dans " << jumpStartFilePath << " n'a pas pu être convertie en entier : " << line << endl;
+			}else{
+				cerr << "An entry in " << jumpStartFilePath << " could not be converted into an integer : " << line << endl;
+			}
+				
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if(currLocale == "fr_FR"){
+			cerr << "Le fichier " << jumpStartFilePath << " n'a pas pu être ouvert.";
+		}else{
+			cerr << "File " << jumpStartFilePath << " could not be opened";
+		}
+		exit(EXIT_FAILURE);
+	}
+}
+
+void Sieve::savePrimeList(string &primeListPath){
+	ofstream outputFile;
+	outputFile.open(primeListPath, ios::out | ios::app);
+	outputFile.close();
+	outputFile.open(primeListPath, ios::in | ios::trunc);
+	outputFile << primes->toString("\n");
+	outputFile.close();
+}
+
+void Sieve::destroy(){
+	delete(cycles);
+	primes->destroy();
+	delete(primes);
+	recurrences[1]->destroy();
+}

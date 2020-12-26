@@ -1,0 +1,65 @@
+#ifndef H_SIEVE
+#define H_SIEVE
+
+#include <fstream>
+#include <map>
+#include <math.h>
+#include <chrono>
+
+#include "Loop.h"
+#include "Primelist.h"
+#include "Recurrence.h"
+
+typedef string::size_type MapSize;
+
+struct Cycle {
+	int mods[4];
+	int gaps[3];
+};
+
+struct Cycles {
+	Cycle cycle1 = {{1,3,7,9},{0,0,0}};
+	Cycle cycle3 = {{3,9,1,7},{0,2,0}};
+	Cycle cycle7 = {{7,1,9,3},{2,2,2}};
+	Cycle cycle9 = {{9,7,3,1},{2,4,2}};
+	int tensGaps[3] = {2,4,2};
+	int probeLoop[4] = {2,2,4,2};
+	
+	Cycle getCycle(int mod10){
+		// TODO : remplacer par un switch case
+		if(mod10 == 1) return cycle1;
+		if(mod10 == 3) return cycle3;
+		if(mod10 == 7) return cycle7;
+		if(mod10 == 9) return cycle9;
+	}
+};
+
+class Sieve {	
+	private:
+		time_t analyseStart, analyseEnd;
+		int primalityFormatingIndex;
+		unsigned int currSquare, currPosProbeLoop;
+		int* tensWidth;
+		unsigned long probe, currTen;
+	public:
+		bool hasZero;
+		Cycles* cycles;
+		PrimeList* primes;
+		//Loop* probeloop;
+		List* zeros; 
+		map<int, Recurrence*> recurrences;
+		map<int, Recurrence*>::iterator iter_rec;
+
+		Sieve(int* zeroFormatingWidth);
+		void alignRecurrences();
+		void addPrime(unsigned long prime);
+		void addCycle();
+		void savePrimeList(string &primeListPath);
+		void loadPreviousStates(string &jumpStartFilePath);
+		void loadPrimeList(string &jumpStartFilePath);
+		void saveTenPrimality(unsigned long &currTen);
+		void analyse(unsigned long limit, bool saveTenModularPrimality, bool isJumpStarted);
+		void destroy();
+};
+
+#endif
