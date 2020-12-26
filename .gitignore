@@ -1,4 +1,4 @@
-factotum.txt
 make.log
-primality_*.txt
+*.txt
 sieve
+!todo.txt
