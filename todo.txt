@@ -1,0 +1,73 @@
+**Further ado**
+
+Log 
+	- composite=prime1*prime2 by mod10(composite)
+
+Analyse
+	-> spreading ?
+	-> relationship with prime by mod10
+
+Log
+	- ... by mod10(prime1)
+	- ... by mod10(prime2)
+
+Analyse remaining composites
+	- prime²*prime / prime*prime*prime / pow(prime,3) / ...
+
+==================================== 
+
+Tester l'analyse avec chargement et sauvegarde avec Valgrind
+
+Revoir l'application du paramètre de limitation : on doit arrêter l'analyse à la dizaine immédiatement inférieure
+
+Ajouter une option -i --interactive :
+	- Gérer un historique de session accessible via up/down
+	- Traiter les arguments en entrée mais ne pas lancer l'analyse
+	- Ouvrir un prompt >
+	> print-tens <CHEMIN_FICHIER> <LINE_WIDTH>
+	> print-recurrences
+	> print-primelist
+	> check-primelist <CHEMIN_FICHIER>
+	> jump-start <CHEMIN_FICHIER>
+	> analyse <LIMIT>
+	> help 
+
+_ Ajouter une option -f --factorize <Number>
+	- if lastPrime() < Number then analyse further
+	- else try dividing by 5 and 2 (while...) ==> Number -> Remainder
+		-> compute recurrences with bound at sqrt(Remainder)
+		-> extract zeros in recurrences matrix and try dividing Remainder by those factors (while...)
+
+_/ Ajouter une option -c --compare <FILE> :
+	_/ Modifier main.cpp
+	_/ Implémenter Sieve::compareCheck(string& filepath);
+	_/ Comparer un à un les premiers de chacune des listes en s'arrêtant à la fin de la plus courte
+	_/ Faire une sortie console des similitudes/divergences compressées :
+
+_/ debug semgentation faults via "gdb ./sieve" > "run <MAIN_ARGS>" > "backtrace"
+_/ valgrind --leak-check=yes --track-origins=yes ./sieve -l 10000
+_/ Travailler les passages par références pour limiter l'impact mémoire :
+	https://cpp.developpez.com/cours/cpp/?page=page_6
+
+_/ Revoir le chargement d'une liste :
+	bug :
+		- faire une première passe l=300 avec sauvegarde
+		- faire une seconde passe l=400 avec sauvegarde en incluant le chargement de la liste précédemment sauvegardée
+		--> il manque 311, 313, et 317 à la dernière liste sauvegardée
+		..? la première liste ne s'arrête pas à 300 mais à 307. La dizaine des 300 est donc traitée.
+			Est-ce une problème ? : Dans une progression itérative par centaine avec chargement de la liste précédente,
+			le problème se reproduit toujours pour le calcul d'un l=400 à partir d'un l=300
+
+			17*17=289 19*19=361 23*23=529 29*29=841
+			sqrt(307)~=17.52  sqrt(607)~=24.63
+
+		- Le probème se reproduit pour le calcul d'un l=700 à partir d'un l=600
+		- l=600 se termine en 601,607
+		- l=700 reprend à partir de 609 et non 613,617,619...
+
+		- l=690 à partir d'un l=290
+		--> c'est comme si les résultats suivants étaient décalés -10 par rapport à la réalité jusqu'à 387
+
+_/ Créer un système de log :
+	- boolean = logActivated
+	- Créer une méthode dans make pour pouvoir supprimer le code relatif aux logs avant compilation
